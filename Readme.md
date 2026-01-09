@@ -86,4 +86,4 @@ This project is licensed under the [MIT License](LICENSE).
 This project is licensed under the **MIT** License.
 
 ---
-🔗 GitHub Repo: https://github.com/selvaganesh19/Beach-Safety-Chatbot-frontend
+🔗 GitHub Repo: https://github.com/sakthi-28/Beach-Safety-Chatbot-frontend
