@@ -1,0 +1,996 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Indian Beach Safety Chatbot - Real-time beach safety information, weather updates, and location tracking">
+    <meta name="theme-color" content="#0f766e">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Beach Safety">
+    
+    <title>Indian Beach Safety Chatbot</title>
+    
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16x16.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png">
+    <link rel="mask-icon" href="icons/safari-pinned-tab.svg" color="#0f766e">
+    <meta name="msapplication-config" content="icons/browserconfig.xml">
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #0f766e;
+            --primary-light: #14b8a6;
+            --accent: #f97316;
+            --accent-light: #fed7aa;
+            --success: #16a34a;
+            --warning: #ea580c;
+            --danger: #dc2626;
+            --bg: #f0f9ff;
+            --surface: #ffffff;
+            --text: #1e293b;
+            --text-secondary: #64748b;
+            --border: #e2e8f0;
+            --shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.15);
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #e0f2fe 0%, #f0fdfa 50%, #fef3c7 100%);
+            color: var(--text);
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Install Banner */
+        .install-banner {
+            background: linear-gradient(135deg, var(--accent) 0%, #fb923c 100%);
+            color: white;
+            padding: 0.75rem 1rem;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            gap: 1rem;
+            box-shadow: var(--shadow);
+            position: relative;
+            z-index: 100;
+        }
+
+        .install-banner.show {
+            display: flex;
+        }
+
+        .install-banner-text {
+            font-size: 0.9rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .install-btn {
+            padding: 0.5rem 1.25rem;
+            background: white;
+            color: var(--accent);
+            border: none;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .install-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+
+        .install-btn:active {
+            transform: scale(0.98);
+        }
+
+        .install-close-btn {
+            position: absolute;
+            right: 1rem;
+            background: transparent;
+            border: none;
+            color: white;
+            font-size: 1.25rem;
+            cursor: pointer;
+            opacity: 0.8;
+            transition: opacity 0.3s;
+            padding: 0.25rem;
+        }
+
+        .install-close-btn:hover {
+            opacity: 1;
+        }
+
+        .container {
+            display: flex;
+            height: calc(100vh - var(--banner-height, 0px));
+            max-width: 1600px;
+            margin: 0 auto;
+            gap: 1rem;
+            padding: 1rem;
+        }
+
+        /* Chat Panel */
+        .chat-panel {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            max-width: 450px;
+            background: var(--surface);
+            border-radius: 16px;
+            box-shadow: var(--shadow-lg);
+            overflow: hidden;
+            border: 1px solid var(--border);
+        }
+
+        .chat-header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+            color: white;
+            padding: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        .chat-header .emoji {
+            font-size: 2rem;
+            animation: float 3s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            background: linear-gradient(to bottom, rgba(240, 253, 250, 0.5), rgba(240, 249, 255, 0.5));
+        }
+
+        .message {
+            display: flex;
+            gap: 0.75rem;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .message.user {
+            justify-content: flex-end;
+        }
+
+        .message-bubble {
+            max-width: 85%;
+            padding: 0.75rem 1rem;
+            border-radius: 12px;
+            line-height: 1.5;
+            font-size: 0.95rem;
+            word-wrap: break-word;
+        }
+
+        .message.bot .message-bubble {
+            background: var(--bg);
+            color: var(--text);
+            border: 1px solid var(--border);
+            border-bottom-left-radius: 4px;
+        }
+
+        .message.user .message-bubble {
+            background: linear-gradient(135deg, var(--primary), var(--primary-light));
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+
+        .message-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            flex-shrink: 0;
+        }
+
+        .message.bot .message-avatar {
+            background: var(--primary);
+            color: white;
+        }
+
+        /* Response Card */
+        .response-card {
+            background: linear-gradient(135deg, rgba(20, 184, 166, 0.05) 0%, rgba(15, 118, 110, 0.05) 100%);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1rem;
+            margin: 0.5rem 0;
+            font-size: 0.9rem;
+        }
+
+        .response-card h3 {
+            color: var(--primary);
+            margin-bottom: 0.5rem;
+            font-size: 1.1rem;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.85rem;
+            margin-bottom: 0.75rem;
+            text-transform: uppercase;
+        }
+
+        .status-badge.SUITABLE {
+            background: rgba(22, 163, 74, 0.15);
+            color: var(--success);
+        }
+
+        .status-badge.CAUTION {
+            background: rgba(234, 88, 12, 0.15);
+            color: var(--warning);
+        }
+
+        .status-badge.NOT_SUITABLE {
+            background: rgba(220, 38, 38, 0.15);
+            color: var(--danger);
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.75rem;
+            margin: 0.75rem 0;
+        }
+
+        .info-item {
+            background: rgba(255, 255, 255, 0.7);
+            padding: 0.5rem;
+            border-radius: 8px;
+            border-left: 3px solid var(--primary);
+        }
+
+        .info-item .label {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
+        .info-item .value {
+            font-weight: 600;
+            color: var(--text);
+            margin-top: 0.25rem;
+        }
+
+        .details-list {
+            margin-top: 0.75rem;
+            padding: 0;
+            list-style: none;
+        }
+
+        .details-list li {
+            padding: 0.4rem 0;
+            padding-left: 1.5rem;
+            position: relative;
+            font-size: 0.9rem;
+            color: var(--text);
+            line-height: 1.4;
+        }
+
+        .details-list li:before {
+            content: "•";
+            position: absolute;
+            left: 0.5rem;
+            color: var(--primary);
+            font-weight: bold;
+        }
+
+        /* Input Area */
+        .chat-input-area {
+            padding: 1rem;
+            background: var(--surface);
+            border-top: 1px solid var(--border);
+            display: flex;
+            gap: 0.75rem;
+        }
+
+        .input-wrapper {
+            flex: 1;
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        #beachInput {
+            flex: 1;
+            padding: 0.75rem 1rem;
+            border: 1.5px solid var(--border);
+            border-radius: 10px;
+            font-size: 0.95rem;
+            transition: all 0.3s ease;
+            font-family: inherit;
+        }
+
+        #beachInput:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.1);
+        }
+
+        #beachInput::placeholder {
+            color: var(--text-secondary);
+        }
+
+        .send-btn {
+            padding: 0.75rem 1.5rem;
+            background: linear-gradient(135deg, var(--primary), var(--primary-light));
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 50px;
+        }
+
+        .send-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow);
+        }
+
+        .send-btn:active {
+            transform: translateY(0);
+        }
+
+        .send-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 1rem;
+            height: 1rem;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Map Panel */
+        .map-panel {
+            flex: 1;
+            background: var(--surface);
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: var(--shadow-lg);
+            border: 1px solid var(--border);
+            display: none;
+        }
+
+        .map-panel.active {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .map-header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+            color: white;
+            padding: 1rem 1.5rem;
+            font-weight: 600;
+        }
+
+        #map {
+            flex: 1;
+            min-height: 300px;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 1024px) {
+            .container {
+                flex-direction: column;
+            }
+
+            .chat-panel {
+                max-width: 100%;
+                height: 400px;
+            }
+
+            .map-panel {
+                max-width: 100%;
+                height: 400px;
+                display: none !important;
+            }
+
+            .map-panel.active {
+                display: flex !important;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .container {
+                padding: 0.5rem;
+                gap: 0.5rem;
+            }
+
+            .chat-panel {
+                border-radius: 12px;
+            }
+
+            .chat-header {
+                padding: 1rem;
+                font-size: 1.25rem;
+            }
+
+            .chat-header .emoji {
+                font-size: 1.5rem;
+            }
+
+            .message-bubble {
+                max-width: 90%;
+            }
+
+            .info-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .install-banner {
+                flex-wrap: wrap;
+                padding: 0.5rem;
+                gap: 0.5rem;
+            }
+
+            .install-banner-text {
+                font-size: 0.8rem;
+            }
+
+            .install-btn {
+                padding: 0.4rem 1rem;
+                font-size: 0.8rem;
+            }
+
+            .install-close-btn {
+                position: static;
+            }
+        }
+
+        /* Scrollbar Styling */
+        .chat-messages::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .chat-messages::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .chat-messages::-webkit-scrollbar-thumb {
+            background: rgba(15, 118, 110, 0.3);
+            border-radius: 3px;
+        }
+
+        .chat-messages::-webkit-scrollbar-thumb:hover {
+            background: rgba(15, 118, 110, 0.5);
+        }
+
+        /* Loading State */
+        .typing-indicator {
+            display: flex;
+            gap: 4px;
+            padding: 0.75rem 1rem;
+            background: var(--bg);
+            border-radius: 12px;
+            width: fit-content;
+            border: 1px solid var(--border);
+        }
+
+        .typing-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--text-secondary);
+            animation: typing 1.4s infinite;
+        }
+
+        .typing-dot:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .typing-dot:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes typing {
+            0%, 60%, 100% {
+                opacity: 0.5;
+                transform: translateY(0);
+            }
+            30% {
+                opacity: 1;
+                transform: translateY(-10px);
+            }
+        }
+
+        /* Empty State */
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: var(--text-secondary);
+            text-align: center;
+            padding: 2rem;
+        }
+
+        .empty-state-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+
+        .empty-state p {
+            font-size: 0.9rem;
+            line-height: 1.6;
+        }
+
+        .suggestions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+
+        .suggestion-btn {
+            padding: 0.5rem 1rem;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            color: var(--primary);
+        }
+
+        .suggestion-btn:hover {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+    </style>
+</head>
+<body>
+    <!-- PWA Install Banner -->
+    <div class="install-banner" id="installBanner">
+        <span class="install-banner-text">
+            📲 Install Beach Safety App for quick access!
+        </span>
+        <button class="install-btn" id="installBtn" onclick="installPWA()">
+            <span>⬇️</span> Install App
+        </button>
+        <button class="install-close-btn" onclick="dismissInstallBanner()" aria-label="Close">✕</button>
+    </div>
+
+    <div class="container">
+        <!-- Chat Panel -->
+        <div class="chat-panel">
+            <div class="chat-header">
+                <span class="emoji">🏖️</span>
+                <span>Beach Safety</span>
+            </div>
+
+            <div class="chat-messages" id="chatMessages">
+                <div class="empty-state">
+                    <div class="empty-state-icon">🌊</div>
+                    <p>Welcome to Indian Beach Safety Chatbot</p>
+                    <p style="font-size: 0.8rem; margin-top: 0.5rem;">Enter a beach name to get real-time safety information, weather updates, and location details.</p>
+                    <div class="suggestions">
+                        <button class="suggestion-btn" onclick="selectBeach('Marina Beach')">Marina Beach</button>
+                        <button class="suggestion-btn" onclick="selectBeach('Kovalam Beach')">Kovalam Beach</button>
+                        <button class="suggestion-btn" onclick="selectBeach('Goa Beach')">Goa Beach</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="chat-input-area">
+                <div class="input-wrapper">
+                    <input 
+                        type="text" 
+                        id="beachInput" 
+                        placeholder="Search a beach... (e.g., Marina Beach)"
+                        onkeypress="if(event.key === 'Enter') sendMessage()"
+                    />
+                </div>
+                <button class="send-btn" id="sendBtn" onclick="sendMessage()">
+                    <span>➤</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Map Panel -->
+        <div class="map-panel" id="mapPanel">
+            <div class="map-header">📍 Live Beach Location</div>
+            <div id="map"></div>
+        </div>
+    </div>
+
+    <script>
+        // Backend API endpoint - change this to your server URL
+        const API_URL = 'https://each-afety-hatbot-selvavelayutham5899-peuj5c3b.leapcell.dev/chat';
+
+        // PWA Install functionality
+        let deferredPrompt = null;
+
+        window.addEventListener('beforeinstallprompt', (e) => {
+            // Prevent the mini-infobar from appearing on mobile
+            e.preventDefault();
+            // Store the event for later use
+            deferredPrompt = e;
+            // Show the install banner
+            showInstallBanner();
+        });
+
+        window.addEventListener('appinstalled', () => {
+            // Hide the install banner
+            hideInstallBanner();
+            deferredPrompt = null;
+            console.log('PWA was installed');
+        });
+
+        function showInstallBanner() {
+            const banner = document.getElementById('installBanner');
+            const dismissed = localStorage.getItem('pwaInstallDismissed');
+            
+            // Don't show if user dismissed it recently (within 7 days)
+            if (dismissed) {
+                const dismissedDate = new Date(dismissed);
+                const now = new Date();
+                const daysDiff = (now - dismissedDate) / (1000 * 60 * 60 * 24);
+                if (daysDiff < 7) return;
+            }
+            
+            banner.classList.add('show');
+            updateContainerHeight();
+        }
+
+        function hideInstallBanner() {
+            const banner = document.getElementById('installBanner');
+            banner.classList.remove('show');
+            updateContainerHeight();
+        }
+
+        function dismissInstallBanner() {
+            hideInstallBanner();
+            localStorage.setItem('pwaInstallDismissed', new Date().toISOString());
+        }
+
+        function updateContainerHeight() {
+            const banner = document.getElementById('installBanner');
+            const isVisible = banner.classList.contains('show');
+            document.documentElement.style.setProperty(
+                '--banner-height', 
+                isVisible ? banner.offsetHeight + 'px' : '0px'
+            );
+        }
+
+        async function installPWA() {
+            if (!deferredPrompt) {
+                // Fallback for browsers that don't support beforeinstallprompt
+                alert('To install this app:\n\n• On Chrome: Click the menu (⋮) → "Install app"\n• On Safari: Tap Share → "Add to Home Screen"\n• On Firefox: Click menu → "Install"');
+                return;
+            }
+
+            // Show the install prompt
+            deferredPrompt.prompt();
+            
+            // Wait for the user's response
+            const { outcome } = await deferredPrompt.userChoice;
+            console.log(`User response to install prompt: ${outcome}`);
+            
+            // Clear the deferred prompt
+            deferredPrompt = null;
+            hideInstallBanner();
+        }
+
+        // Initialize map
+        let map = null;
+        let marker = null;
+        let mapInitialized = false;
+
+        function initializeMap() {
+            if (mapInitialized) return;
+            
+            map = L.map('map').setView([20, 78], 5);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors',
+                maxZoom: 19,
+            }).addTo(map);
+            mapInitialized = true;
+        }
+
+        function showMap() {
+            document.getElementById('mapPanel').classList.add('active');
+            if (map && map._container) {
+                setTimeout(() => map.invalidateSize(), 100);
+            }
+        }
+
+        function selectBeach(beachName) {
+            document.getElementById('beachInput').value = beachName;
+            sendMessage();
+        }
+
+        function addMessage(text, isUser = false) {
+            const messagesDiv = document.getElementById('chatMessages');
+            
+            // Remove empty state if exists
+            const emptyState = messagesDiv.querySelector('.empty-state');
+            if (emptyState) emptyState.remove();
+
+            const messageEl = document.createElement('div');
+            messageEl.className = `message ${isUser ? 'user' : 'bot'}`;
+            
+            if (isUser) {
+                messageEl.innerHTML = `
+                    <div class="message-bubble">${escapeHtml(text)}</div>
+                    <div class="message-avatar">👤</div>
+                `;
+            } else {
+                messageEl.innerHTML = `
+                    <div class="message-avatar">🤖</div>
+                    <div class="message-bubble">${text}</div>
+                `;
+            }
+
+            messagesDiv.appendChild(messageEl);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        function addTypingIndicator() {
+            const messagesDiv = document.getElementById('chatMessages');
+            const typingEl = document.createElement('div');
+            typingEl.className = 'message bot';
+            typingEl.id = 'typingIndicator';
+            typingEl.innerHTML = `
+                <div class="message-avatar">🤖</div>
+                <div class="typing-indicator">
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                </div>
+            `;
+            messagesDiv.appendChild(typingEl);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        function removeTypingIndicator() {
+            const typingEl = document.getElementById('typingIndicator');
+            if (typingEl) typingEl.remove();
+        }
+
+        function formatResponseCard(data) {
+            if (!data) return '';
+
+            const statusColor = data.color || 'SUITABLE';
+            const statusText = data.status || 'Unknown';
+            
+            return `
+                <div class="response-card">
+                    <h3>🏖️ ${escapeHtml(data.beach || 'Beach')}</h3>
+                    <div class="status-badge ${statusColor}">${statusText}</div>
+                    
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <div class="label">🌡️ Temperature</div>
+                            <div class="value">${data.weather?.temp || 'N/A'}°C</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="label">💨 Wind Speed</div>
+                            <div class="value">${data.weather?.wind || 'N/A'} km/h</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="label">📊 Min Temp</div>
+                            <div class="value">${data.weather?.min || 'N/A'}°C</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="label">📊 Max Temp</div>
+                            <div class="value">${data.weather?.max || 'N/A'}°C</div>
+                        </div>
+                    </div>
+
+                    ${data.water_details ? `
+                        <div style="margin-top: 0.75rem; padding: 0.75rem; background: rgba(255,255,255,0.7); border-radius: 8px; border-left: 3px solid var(--primary);">
+                            <div style="font-weight: 600; color: var(--text); margin-bottom: 0.25rem;">🌊 Water Details</div>
+                            <div style="font-size: 0.9rem; color: var(--text);">${escapeHtml(data.water_details)}</div>
+                        </div>
+                    ` : ''}
+
+                    ${data.famous_for ? `
+                        <div style="margin-top: 0.75rem; padding: 0.75rem; background: rgba(255,255,255,0.7); border-radius: 8px; border-left: 3px solid var(--accent);">
+                            <div style="font-weight: 600; color: var(--text); margin-bottom: 0.25rem;">✨ Famous For</div>
+                            <div style="font-size: 0.9rem; color: var(--text);">${escapeHtml(data.famous_for)}</div>
+                        </div>
+                    ` : ''}
+
+                    ${data.hotspots && data.hotspots.length > 0 ? `
+                        <div style="margin-top: 0.75rem;">
+                            <div style="font-weight: 600; color: var(--text); margin-bottom: 0.5rem; font-size: 0.9rem;">🎯 Popular Hotspots</div>
+                            <ul class="details-list">
+                                ${data.hotspots.map(h => `<li>${escapeHtml(h)}</li>`).join('')}
+                            </ul>
+                        </div>
+                    ` : ''}
+
+                    ${data.safety_rules && data.safety_rules.length > 0 ? `
+                        <div style="margin-top: 0.75rem;">
+                            <div style="font-weight: 600; color: var(--text); margin-bottom: 0.5rem; font-size: 0.9rem;">⚠️ Safety Rules</div>
+                            <ul class="details-list">
+                                ${data.safety_rules.map(r => `<li>${escapeHtml(r)}</li>`).join('')}
+                            </ul>
+                        </div>
+                    ` : ''}
+
+                    ${data.best_time ? `
+                        <div style="margin-top: 0.75rem; padding: 0.75rem; background: rgba(255,255,255,0.7); border-radius: 8px; border-left: 3px solid var(--success);">
+                            <div style="font-weight: 600; color: var(--text); margin-bottom: 0.25rem;">⏰ Best Time</div>
+                            <div style="font-size: 0.9rem; color: var(--text);">${escapeHtml(data.best_time)}</div>
+                        </div>
+                    ` : ''}
+
+                    ${data.reply ? `
+                        <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid rgba(0,0,0,0.1);">
+                            <div style="font-size: 0.9rem; color: var(--text); font-style: italic; line-height: 1.6;">"${escapeHtml(data.reply)}"</div>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('beachInput');
+            const sendBtn = document.getElementById('sendBtn');
+            const message = input.value.trim();
+
+            if (!message) return;
+
+            // Disable input
+            input.disabled = true;
+            sendBtn.disabled = true;
+            sendBtn.innerHTML = '<div class="spinner"></div>';
+
+            // Add user message
+            addMessage(message, true);
+
+            // Add typing indicator
+            addTypingIndicator();
+
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ message: message })
+                });
+
+                const data = await response.json();
+
+                removeTypingIndicator();
+
+                if (data.error) {
+                    addMessage(`❌ ${escapeHtml(data.error)}`);
+                } else {
+                    // Show map
+                    showMap();
+                    initializeMap();
+
+                    // Update marker on map
+                    if (map && data.lat && data.lon) {
+                        if (marker) {
+                            map.removeLayer(marker);
+                        }
+
+                        const statusColor = {
+                            'RED': '#dc2626',
+                            'YELLOW': '#ea580c',
+                            'GREEN': '#16a34a'
+                        }[data.color] || '#0f766e';
+
+                        marker = L.circleMarker([data.lat, data.lon], {
+                            color: statusColor,
+                            radius: 15,
+                            fillColor: statusColor,
+                            fillOpacity: 0.8,
+                            weight: 3
+                        }).addTo(map);
+
+                        // Add popup
+                        marker.bindPopup(`
+                            <div style="font-weight: 600; color: ${statusColor};">
+                                ${escapeHtml(data.beach || 'Beach')}<br>
+                                Status: ${data.status}
+                            </div>
+                        `).openPopup();
+
+                        map.setView([data.lat, data.lon], 11);
+                    }
+
+                    // Display formatted response
+                    addMessage(formatResponseCard(data));
+                }
+            } catch (error) {
+                removeTypingIndicator();
+                addMessage(`❌ Connection error: ${error.message}. Make sure the backend server is running.`);
+            } finally {
+                // Re-enable input
+                input.value = '';
+                input.disabled = false;
+                sendBtn.disabled = false;
+                sendBtn.innerHTML = '➤';
+                input.focus();
+            }
+        }
+
+        // Register service worker
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js').catch(err => {
+                console.log('Service Worker registration failed:', err);
+            });
+        }
+
+        // Focus input on load
+        window.addEventListener('load', () => {
+            document.getElementById('beachInput').focus();
+        });
+    </script>
+</body>
+</html>
